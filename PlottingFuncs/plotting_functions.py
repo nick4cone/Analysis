@@ -34,18 +34,13 @@ def ListedCMAP_Wrapper(color_cutoff_bounds, base_cmap_name):
     # High
     high_cm = mpl.colors.ListedColormap(base_cmap(x**2.0))
 
-    fig = plt.figure()
+    fig = plt.figure(layout='constrained')
     for i, (cmap, title) in enumerate([(lin_cm, 'linear'), (low_cm, 'low'), (high_cm, 'high')]):
         ax = fig.add_subplot(1, 3, i+1)
-        divider = make_axes_locatable(ax)
-        ax_cb = divider.append_axes("right", size="40%", pad=0.05)
-        fig = ax.get_figure()
-        fig.add_axes(ax_cb)
-        plt.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=ax_cb,
+        fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=ax,
                      ticks=color_cutoff_bounds)
         ax.set_title(title)
 
-    fig.tight_layout()
     return norm, lin_cm, low_cm, high_cm
 
 def Hybrid2plev(ux_dataset, var_string, xlims, ylims, destination_plevs_pascals, interp_method_str, return_as_ux):
