@@ -115,7 +115,7 @@ def PlotHelper(subsetted_2D_var,
     def update(frame):
         print(f'frame {frame}')
         im.set_data(subsetted_2D_var[frame, :].to_raster(ax=ax, pixel_mapping=pixel_mapping))
-        ax.set_title(f'{title_no_end_space} {subsetted_2D_var[frame, :].time.values.item().strftime('%H:%M')}\nmicrop_uniform={microp_status}')
+        ax.set_title(f'{title_no_end_space} {subsetted_2D_var[frame, :].time.values.item().strftime("%H:%M")}\nmicrop_uniform={microp_status}')
         return im
 
     ani = animation.FuncAnimation(fig, update, frames=range(48))
@@ -124,16 +124,13 @@ def PlotHelper(subsetted_2D_var,
     ani.save(anim_save_path)
     print('Animation saved!')
 
-def PlotHelper(subsetted_2D_var,
+def ContourPlotHelper(subsetted_2D_var,
                title_no_end_space,
                microp_status,
                anim_save_path,
                xlims,
                ylims,
-               a_cmap,
                bounds,
-               color_norm,
-               cb_label,
                projection=ccrs.PlateCarree(),
                figsize=(8, 6),
                dpi=200):
@@ -147,20 +144,12 @@ def PlotHelper(subsetted_2D_var,
 
     raster_temp = subsetted_2D_var[0, :].to_raster(ax=ax)
 
-    im = ax.imshow(
-        raster_temp,
-        cmap=a_cmap,
-        origin="lower",
-        norm=color_norm,
-        extent=ax.get_xlim() + ax.get_ylim()
-    )
-
-    # Add an Axes to the right of the main Axes.
-    ax_divider = make_axes_locatable(ax)
-    cax = ax_divider.append_axes("right", size="7%", pad="2%", axes_class=plt.Axes)
-    cb = fig.colorbar(im, cax=cax, ticks=bounds, extend='both')
-    cb.set_label(cb_label)
-    cb.ax.tick_params(labelsize=8)
+    contour = ax.contour(raster_temp,
+                         colors='black',
+                         origin='lower',
+                         extent=ax.get_xlim() + ax.get_ylim(),
+                         levels=bounds
+                        )
 
     fig.canvas.draw()
 
@@ -173,10 +162,20 @@ def PlotHelper(subsetted_2D_var,
     # Animation
     # ---------------------------------------------------------------
     def update(frame):
+        nonlocal contour
         print(f'frame {frame}')
-        im.set_data(subsetted_2D_var[frame, :].to_raster(ax=ax, pixel_mapping=pixel_mapping))
-        ax.set_title(f'{title_no_end_space} {subsetted_2D_var[frame, :].time.values.item().strftime('%H:%M')}\nmicrop_uniform={microp_status}')
-        return im
+
+        contour.remove()
+
+        contour = ax.contour(subsetted_2D_var[frame, :].to_raster(ax=ax, pixel_mapping=pixel_mapping),
+                             colors='black',
+                             origin='lower',
+                             extent=ax.get_xlim() + ax.get_ylim(),
+                             levels=bounds
+                            )
+        ax.clabel(contour, contour.levels)
+        ax.set_title(f'{title_no_end_space} {subsetted_2D_var[frame, :].time.values.item().strftime("%H:%M")}\nmicrop_uniform={microp_status}')
+        return contour
 
     ani = animation.FuncAnimation(fig, update, frames=range(48))
 
