@@ -124,6 +124,46 @@ def PlotHelper(subsetted_2D_var,
     ani.save(anim_save_path)
     print('Animation saved!')
 
+def StaticPlotHelper(subsetted_2D_var,
+                     title_no_end_space,
+                     microp_status,
+                     xlims,
+                     ylims,
+                     a_cmap,
+                     bounds,
+                     color_norm,
+                     cb_label,
+                     projection=ccrs.PlateCarree(),
+                     figsize=(8, 6),
+                     dpi=200):
+
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi, subplot_kw={"projection": projection})
+
+    ax.set_extent((xlims[0], xlims[1], ylims[0], ylims[1]), crs=projection)
+    ax.set_xticks(range(xlims[0], xlims[1]+1), crs=projection)
+    ax.set_yticks(range(ylims[0], ylims[1]+1), crs=projection)
+    ax.add_feature(cfeature.STATES)
+    ax.set_title(f'{title_no_end_space} {subsetted_2D_var[0, :].time.values.item().strftime("%H:%M")}\nmicrop_uniform={microp_status}')
+
+    raster_temp = subsetted_2D_var[0, :].to_raster(ax=ax)
+
+    im = ax.imshow(
+        raster_temp,
+        cmap=a_cmap,
+        origin="lower",
+        norm=color_norm,
+        extent=ax.get_xlim() + ax.get_ylim()
+    )
+
+    # Add an Axes to the right of the main Axes.
+    ax_divider = make_axes_locatable(ax)
+    cax = ax_divider.append_axes("right", size="7%", pad="2%", axes_class=plt.Axes)
+    cb = fig.colorbar(im, cax=cax, ticks=bounds, extend='both')
+    cb.set_label(cb_label)
+    cb.ax.tick_params(labelsize=8)
+
+    plt.show()
+
 def ContourPlotHelper(subsetted_2D_var,
                title_no_end_space,
                microp_status,
@@ -182,3 +222,42 @@ def ContourPlotHelper(subsetted_2D_var,
     print(f'Saving animation to {anim_save_path}')
     ani.save(anim_save_path)
     print('Animation saved!')
+
+def interp_one_column(destination_zlevs_meters, source_Z3s, data):
+    return np.interp(destination_zlevs_meters, source_Z3s, data)
+
+def interp_all_columns(ux_dataset,
+                       var_string_3D,
+                       xlims,
+                       ylims,
+                       destination_zlevs_meters):
+
+    subsetted_var_3D = SubsetLatLon(ux_dataset, var_string_3D, xlims, ylims)
+    subsetted_Z3 = SubsetLatLon(ux_dataset, "Z3", xlims, ylims)
+
+    print('flipping dimension ', subsetted_var_3D.dims[1])
+    subsetted_var_flipped = np.flip(subsetted_var_3D, axis=1)
+    subsetted_Z3_flippped = np.flip(subsetted_Z3, axis=1)
+
+    interped = xr.apply_ufunc(
+        interp_one_column,  # first the 1d function
+
+        # now arguments in the order expected by 'interp_one_column'
+        destination_zlevs_meters,
+        subsetted_Z3_flippped,
+        subsetted_var_flipped,
+
+        # list with one entry per argument
+        input_core_dims=[["dest_zlevs"], ["lev"], ["lev"]],
+
+        # returned data has one dimension
+        output_core_dims=[["dest_zlevs"]],
+
+        vectorize=True,  # loop over non-core dims
+        dask="parallelized"
+    )
+
+    interped = interped.rename({"dest_zlevs": "lev"})
+    interped["lev"] = destination_zlevs_meters  # need to add this manually
+
+    return ux.UxDataArray.from_xarray(interped, subsetted_var_3D.uxgrid).transpose("time", "lev", "n_face")
